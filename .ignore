@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+
+# Odoo
+addons/*/static/.build/
+addons/*/static/lib/
+addons/*/node_modules/
+addons/*/dist/
+
+# Postgres data (não versionar!)
+postgresql/
+
+# Docker
+*.log
+
+# Env files
+.env
+*.env
+
+# VSCode
+.vscode/

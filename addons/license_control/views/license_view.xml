@@ -1,0 +1,49 @@
+<odoo>
+    <!-- Form View -->
+    <record id="view_license_control_form" model="ir.ui.view">
+        <field name="name">license.control.form</field>
+        <field name="model">license.control</field>
+        <field name="arch" type="xml">
+            <form string="License Control">
+                <group>
+                    <field name="license_key"/>
+                    <field name="expiration_date"/>
+                    <field name="last_heartbeat" readonly="1"/>
+                    <field name="online_status" readonly="1"/>
+                    <field name="grace_days"/>
+                    <field name="offline_mode"/>
+                </group>
+                <footer>
+                    <button name="verify_license_online" type="object" string="Verify Now" class="btn-primary"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <!-- Tree View -->
+    <record id="view_license_control_tree" model="ir.ui.view">
+        <field name="name">license.control.tree</field>
+        <field name="model">license.control</field>
+        <field name="arch" type="xml">
+            <tree string="License Control">
+                <field name="license_key"/>
+                <field name="expiration_date"/>
+                <field name="online_status"/>
+                <field name="last_heartbeat"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="license_control_action" model="ir.actions.act_window">
+        <field name="name">Licenses</field>
+        <field name="res_model">license.control</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <!-- Main Menu -->
+    <menuitem id="menu_license_control_main" name="License Control" sequence="10"/>
+
+    <!-- Submenu Licenses -->
+    <menuitem id="menu_license_control" name="Licenses" parent="menu_license_control_main" action="license_control_action"/>
+</odoo>
