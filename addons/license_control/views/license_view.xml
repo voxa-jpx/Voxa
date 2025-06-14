@@ -5,17 +5,62 @@
         <field name="model">license.control</field>
         <field name="arch" type="xml">
             <form string="License Control">
-                <group>
-                    <field name="license_key"/>
-                    <field name="expiration_date"/>
-                    <field name="last_heartbeat" readonly="1"/>
-                    <field name="online_status" readonly="1"/>
-                    <field name="grace_days"/>
-                    <field name="offline_mode"/>
-                </group>
-                <footer>
-                    <button name="verify_license_online" type="object" string="Verify Now" class="btn-primary"/>
-                </footer>
+                <header>
+                    <button name="action_force_verification" type="object" string="Verify Now" 
+                            class="btn-primary" attrs="{'invisible': [('is_system_blocked', '=', True)]}"/>
+                    <button name="action_reset_offline_mode" type="object" string="Reset Offline Mode" 
+                            class="btn-warning" attrs="{'invisible': [('offline_mode', '=', False)]}"/>
+                    <field name="online_status" widget="statusbar" statusbar_visible="unknown,active,expired,revoked"/>
+                </header>
+                
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button class="oe_stat_button" type="object" name="action_force_verification" icon="fa-refresh">
+                            <field string="Attempts" name="verification_attempts" widget="statinfo"/>
+                        </button>
+                    </div>
+                    
+                    <div class="alert alert-danger" role="alert" attrs="{'invisible': [('is_system_blocked', '=', False)]}">
+                        <strong>System Blocked!</strong> This license is not valid and the system is blocked.
+                    </div>
+                    
+                    <div class="alert alert-warning" role="alert" attrs="{'invisible': [('offline_mode', '=', False)]}">
+                        <strong>Offline Mode:</strong> License verification is running in offline mode.
+                    </div>
+
+                    <group>
+                        <group string="License Information">
+                            <field name="license_key"/>
+                            <field name="customer_name"/>
+                            <field name="expiration_date"/>
+                            <field name="online_status" readonly="1"/>
+                        </group>
+                        <group string="Status & Control">
+                            <field name="last_heartbeat" readonly="1"/>
+                            <field name="grace_days"/>
+                            <field name="offline_mode"/>
+                            <field name="is_system_blocked" readonly="1"/>
+                        </group>
+                    </group>
+                    
+                    <group string="API Configuration" attrs="{'invisible': [('api_key_configured', '=', True)]}">
+                        <div class="alert alert-warning">
+                            <p><strong>API Not Configured:</strong></p>
+                            <p>Please configure the following environment variables:</p>
+                            <ul>
+                                <li>VOXA_LICENSE_API_URL</li>
+                                <li>VOXA_LICENSE_API_KEY</li>
+                            </ul>
+                        </div>
+                        <field name="api_url" readonly="1"/>
+                        <field name="api_key_configured" readonly="1"/>
+                    </group>
+                    
+                    <group string="Debug Information" groups="base.group_system">
+                        <field name="verification_attempts" readonly="1"/>
+                        <field name="last_error" readonly="1" attrs="{'invisible': [('last_error', '=', False)]}"/>
+                    </group>
+                </sheet>
             </form>
         </field>
     </record>
@@ -25,12 +70,103 @@
         <field name="name">license.control.tree</field>
         <field name="model">license.control</field>
         <field name="arch" type="xml">
-            <tree string="License Control">
+            <tree string="License Control" decoration-success="online_status=='active'" 
+                  decoration-danger="online_status=='revoked' or is_system_blocked==True"
+                  decoration-warning="online_status=='expired' or offline_mode==True">
                 <field name="license_key"/>
-                <field name="expiration_date"/>
+                <field name="customer_name"/>
                 <field name="online_status"/>
                 <field name="last_heartbeat"/>
+                <field name="expiration_date"/>
+                <field name="offline_mode"/>
+                <field name="is_system_blocked"/>
+                <field name="grace_days"/>
             </tree>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_license_control_search" model="ir.ui.view">
+        <field name="name">license.control.search</field>
+        <field name="model">license.control</field>
+        <field name="arch" type="xml">
+            <search string="License Search">
+                <field name="license_key"/>
+                <field name="customer_name"/>
+                <field name="online_status"/>
+                
+                <filter string="Active" name="active" domain="[('online_status', '=', 'active')]"/>
+                <filter string="Expired" name="expired" domain="[('online_status', '=', 'expired')]"/>
+                <filter string="Revoked" name="revoked" domain="[('online_status', '=', 'revoked')]"/>
+                <filter string="Offline Mode" name="offline" domain="[('offline_mode', '=', True)]"/>
+                <filter string="System Blocked" name="blocked" domain="[('is_system_blocked', '=', True)]"/>
+                
+                <separator/>
+                <filter string="Needs Attention" name="attention" 
+                        domain="['|', '|', ('online_status', 'in', ['expired', 'revoked']), ('offline_mode', '=', True), ('is_system_blocked', '=', True)]"/>
+                
+                <group expand="0" string="Group By">
+                    <filter string="Status" name="group_status" context="{'group_by': 'online_status'}"/>
+                    <filter string="Customer" name="group_customer" context="{'group_by': 'customer_name'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Kanban View -->
+    <record id="view_license_control_kanban" model="ir.ui.view">
+        <field name="name">license.control.kanban</field>
+        <field name="model">license.control</field>
+        <field name="arch" type="xml">
+            <kanban>
+                <field name="license_key"/>
+                <field name="customer_name"/>
+                <field name="online_status"/>
+                <field name="last_heartbeat"/>
+                <field name="offline_mode"/>
+                <field name="is_system_blocked"/>
+                
+                <templates>
+                    <t t-name="kanban-box">
+                        <div t-attf-class="oe_kanban_card oe_kanban_global_click 
+                                         #{record.online_status.raw_value == 'active' ? 'oe_kanban_color_2' : ''}
+                                         #{record.online_status.raw_value == 'expired' ? 'oe_kanban_color_6' : ''}
+                                         #{record.online_status.raw_value == 'revoked' ? 'oe_kanban_color_1' : ''}">
+                            <div class="oe_kanban_content">
+                                <div class="o_kanban_record_top">
+                                    <div class="o_kanban_record_headings">
+                                        <strong class="o_kanban_record_title">
+                                            <field name="license_key"/>
+                                        </strong>
+                                    </div>
+                                    <div class="o_kanban_record_title">
+                                        <t t-if="record.customer_name.value">
+                                            <field name="customer_name"/>
+                                        </t>
+                                    </div>
+                                </div>
+                                <div class="o_kanban_record_body">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <span class="fa fa-circle text-success" t-if="record.online_status.raw_value == 'active'"/>
+                                            <span class="fa fa-circle text-warning" t-if="record.online_status.raw_value == 'expired'"/>
+                                            <span class="fa fa-circle text-danger" t-if="record.online_status.raw_value == 'revoked'"/>
+                                            <span class="fa fa-circle text-muted" t-if="record.online_status.raw_value == 'unknown'"/>
+                                            <field name="online_status"/>
+                                        </div>
+                                        <div class="col-6" t-if="record.offline_mode.raw_value">
+                                            <span class="badge badge-warning">Offline</span>
+                                        </div>
+                                    </div>
+                                    <div t-if="record.is_system_blocked.raw_value" class="mt8">
+                                        <span class="badge badge-danger">System Blocked</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
         </field>
     </record>
 
@@ -38,12 +174,24 @@
     <record id="license_control_action" model="ir.actions.act_window">
         <field name="name">Licenses</field>
         <field name="res_model">license.control</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">kanban,tree,form</field>
+        <field name="context">{'search_default_attention': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Create your first license!
+            </p>
+            <p>
+                Add license keys to manage and monitor your Voxa system licenses.
+            </p>
+        </field>
     </record>
 
     <!-- Main Menu -->
-    <menuitem id="menu_license_control_main" name="License Control" sequence="10"/>
+    <menuitem id="menu_license_control_main" name="License Control" sequence="5" web_icon="license_control,static/description/icon.png"/>
 
     <!-- Submenu Licenses -->
-    <menuitem id="menu_license_control" name="Licenses" parent="menu_license_control_main" action="license_control_action"/>
+    <menuitem id="menu_license_control" name="Licenses" parent="menu_license_control_main" action="license_control_action" sequence="10"/>
+    
+    <!-- Dashboard Menu -->
+    <menuitem id="menu_license_dashboard" name="Dashboard" parent="menu_license_control_main" sequence="5"/>
 </odoo>
