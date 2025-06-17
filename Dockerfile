@@ -35,21 +35,31 @@ RUN pip3 install --break-system-packages \
 RUN mkdir -p /var/lib/odoo/filestore && \
     mkdir -p /var/lib/odoo/sessions && \
     mkdir -p /mnt/extra-addons && \
+    mkdir -p /var/lib/odoo/addons && \
     chown -R odoo:odoo /var/lib/odoo && \
     chown -R odoo:odoo /mnt/extra-addons
 
-# Copiar configuração personalizada se existir
+# Copiar configuração personalizada
 COPY --chown=odoo:odoo odoo.conf /etc/odoo/odoo.conf
 
 # Voltar para usuário odoo
 USER odoo
 
+# Definir variáveis de environment para assets
+ENV ODOO_ASSETS_DEBUG=False
+ENV ODOO_ASSETS_PRECOMPILE=True
+
 # Expor porta
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=5 \
-    CMD curl -f http://localhost:8000/web/health || exit 1
+# Health check melhorado
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
+    CMD curl -f http://localhost:8000/web/health || curl -f http://localhost:8000/web/database/selector || exit 1
+
+# Script de inicialização personalizado
+COPY --chown=odoo:odoo docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Comando padrão
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["odoo"]

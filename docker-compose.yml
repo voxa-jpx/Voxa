@@ -8,16 +8,16 @@ services:
     volumes:
       - ./postgresql:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5433:5432"
     networks:
       - voxa_network
 
   odoo:
-    build: .                 # usa nosso Dockerfile mínimo
+    build: .
     depends_on:
       - db
     ports:
-      - "8000:8000"          # host:8000 → container:8000
+      - "8000:8000"
     volumes:
       - ./odoo.conf:/etc/odoo/odoo.conf
       - ./addons:/mnt/extra-addons
@@ -27,3 +27,7 @@ services:
       - PASSWORD=odoo
     networks:
       - voxa_network
+
+networks:
+  voxa_network:
+    external: true

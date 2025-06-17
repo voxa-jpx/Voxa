@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Voxa License Manager',
-    'version': '16.0.1.0.0',
+    'version': '18.0.1.0.0',  # Atualizado para Odoo 18
     'category': 'Administration',
     'summary': 'Sistema de gerenciamento de licenças para Voxa',
     'description': """
@@ -16,16 +16,13 @@
     'depends': ['base', 'web'],
     'data': [
         'security/ir.model.access.csv',
-        'security/license_security.xml',
-        'data/license_data.xml',
-        'views/license_views.xml',
-        'views/license_dashboard.xml',
-        'views/license_menu.xml',
+        'data/scheduled_actions.xml',  # Adicionado arquivo que existe
+        'views/license_view.xml',      # Corrigido nome do arquivo
     ],
     'assets': {
         'web.assets_backend': [
-            'voxa_license/static/src/css/license_dashboard.css',
-            'voxa_license/static/src/js/license_checker.js',
+            'license_control/static/src/css/license_dashboard.css',  # Nome correto do módulo
+            'license_control/static/src/js/license_checker.js',     # Nome correto do módulo
         ],
     },
     'installable': True,
