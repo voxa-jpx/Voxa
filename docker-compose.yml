@@ -1,6 +1,10 @@
+version: '3.8'
+
 services:
-  db:
+  # Banco de dados PostgreSQL para Odoo
+  db-odoo:
     image: postgres:15
+    container_name: voxa_postgres_odoo
     environment:
       - POSTGRES_USER=odoo
       - POSTGRES_PASSWORD=odoo
@@ -11,23 +15,96 @@ services:
       - "5433:5432"
     networks:
       - voxa_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # Banco de dados PostgreSQL para API
+  db-api:
+    image: postgres:15
+    container_name: voxa_postgres_api
+    environment:
+      - POSTGRES_DB=voxa_api
+      - POSTGRES_USER=voxa
+      - POSTGRES_PASSWORD=voxa123
+    volumes:
+      - postgres_api_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - voxa_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voxa -d voxa_api"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Voxa
+  voxa-api:
+    build: 
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: ${API_CONTAINER_NAME:-voxa_api}
+    environment:
+      - DATABASE_URL=postgresql://voxa:voxa123@db-api:5432/voxa_api
+      - VOXA_API_KEY=${VOXA_API_KEY}
+      - PYTHONPATH=/app
+    ports:
+      - "${API_PORT:-8001}:8000"  # Expõe porta 8000 do container na porta 8001 do host
+    volumes:
+      - ./app:/app/app
+      - api_data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      db-api:
+        condition: service_healthy
+    networks:
+      - voxa_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Odoo
   odoo:
     build: .
+    container_name: voxa_odoo
     depends_on:
-      - db
+      db-odoo:
+        condition: service_healthy
+      voxa-api:
+        condition: service_healthy
     ports:
-      - "8000:8000"
+      - "8069:8069"
     volumes:
       - ./odoo.conf:/etc/odoo/odoo.conf
       - ./addons:/mnt/extra-addons
+      - ./.env:/mnt/extra-addons/.env:ro  # Monta o .env como read-only
+      - odoo_data:/var/lib/odoo
     environment:
-      - HOST=db
+      - HOST=db-odoo
       - USER=odoo
       - PASSWORD=odoo
+      # Variáveis de ambiente para o módulo de licença
+      - VOXA_LICENSE_API_URL=${VOXA_LICENSE_API_URL}
+      - VOXA_LICENSE_API_KEY=${VOXA_LICENSE_API_KEY}
     networks:
       - voxa_network
+    restart: unless-stopped
 
 networks:
   voxa_network:
-    external: true
+    driver: bridge
+
+volumes:
+  postgres_api_data:
+    driver: local
+  api_data:
+    driver: local
+  odoo_data:
+    driver: local
