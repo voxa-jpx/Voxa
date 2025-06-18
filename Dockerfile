@@ -49,17 +49,17 @@ USER odoo
 ENV ODOO_ASSETS_DEBUG=False
 ENV ODOO_ASSETS_PRECOMPILE=True
 
-# Expor porta
-EXPOSE 8000
+# Expor porta - CORRIGIDO: Odoo usa porta 8069
+EXPOSE 8069
 
-# Health check melhorado
+# Health check melhorado - CORRIGIDO: Usar porta 8069
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
-    CMD curl -f http://localhost:8000/web/health || curl -f http://localhost:8000/web/database/selector || exit 1
+    CMD curl -f http://localhost:8069/web/health || curl -f http://localhost:8069/web/database/selector || exit 1
 
 # Script de inicialização personalizado
-COPY --chown=odoo:odoo docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+COPY --chown=odoo:odoo docker-entrypoint-wsl.sh /docker-entrypoint-wsl.sh
+RUN chmod +x /docker-entrypoint-wsl.sh
 
 # Comando padrão
-ENTRYPOINT ["/docker-entrypoint.sh"]
+ENTRYPOINT ["/docker-entrypoint-wsl.sh"]
 CMD ["odoo"]

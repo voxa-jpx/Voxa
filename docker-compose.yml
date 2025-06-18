@@ -1,8 +1,6 @@
-version: '3.8'
-
 services:
   # Banco de dados PostgreSQL para Odoo
-  db-odoo:
+  db:
     image: postgres:15
     container_name: voxa_postgres_odoo
     environment:
@@ -10,7 +8,7 @@ services:
       - POSTGRES_PASSWORD=odoo
       - POSTGRES_DB=postgres
     volumes:
-      - ./postgresql:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data  # Usar volume nomeado em vez de bind mount
     ports:
       - "5433:5432"
     networks:
@@ -21,90 +19,42 @@ services:
       timeout: 5s
       retries: 5
 
-  # Banco de dados PostgreSQL para API
-  db-api:
-    image: postgres:15
-    container_name: voxa_postgres_api
-    environment:
-      - POSTGRES_DB=voxa_api
-      - POSTGRES_USER=voxa
-      - POSTGRES_PASSWORD=voxa123
-    volumes:
-      - postgres_api_data:/var/lib/postgresql/data
-    ports:
-      - "5434:5432"
-    networks:
-      - voxa_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U voxa -d voxa_api"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # API Voxa
-  voxa-api:
-    build: 
-      context: .
-      dockerfile: Dockerfile.api
-    container_name: ${API_CONTAINER_NAME:-voxa_api}
-    environment:
-      - DATABASE_URL=postgresql://voxa:voxa123@db-api:5432/voxa_api
-      - VOXA_API_KEY=${VOXA_API_KEY}
-      - PYTHONPATH=/app
-    ports:
-      - "${API_PORT:-8001}:8000"  # Expõe porta 8000 do container na porta 8001 do host
-    volumes:
-      - ./app:/app/app
-      - api_data:/app/data
-      - ./logs:/app/logs
-    depends_on:
-      db-api:
-        condition: service_healthy
-    networks:
-      - voxa_network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # Odoo
+  # Odoo (Cliente Voxa)
   odoo:
     build: .
     container_name: voxa_odoo
     depends_on:
-      db-odoo:
-        condition: service_healthy
-      voxa-api:
+      db:
         condition: service_healthy
     ports:
       - "8069:8069"
     volumes:
-      - ./odoo.conf:/etc/odoo/odoo.conf
-      - ./addons:/mnt/extra-addons
-      - ./.env:/mnt/extra-addons/.env:ro  # Monta o .env como read-only
+      - ./odoo.conf:/etc/odoo/odoo.conf:ro
+      - ./addons:/mnt/extra-addons:ro  # Read-only para evitar problemas de permissão
+      - ./.env:/mnt/extra-addons/.env:ro
       - odoo_data:/var/lib/odoo
+      - odoo_filestore:/var/lib/odoo/filestore  # Volume separado para filestore
     environment:
-      - HOST=db-odoo
+      - HOST=db
       - USER=odoo
       - PASSWORD=odoo
       # Variáveis de ambiente para o módulo de licença
-      - VOXA_LICENSE_API_URL=${VOXA_LICENSE_API_URL}
-      - VOXA_LICENSE_API_KEY=${VOXA_LICENSE_API_KEY}
+      - VOXA_LICENSE_API_URL=http://voxa-api:8000/api/license/verify
+      - VOXA_LICENSE_API_KEY=Bearer V9kEXAMPLEp5xGv4jR9_eXaO4Db-YzMVhwGtBmfSY
     networks:
       - voxa_network
     restart: unless-stopped
-
+    # Para WSL, adicionar estas configurações
+    user: "0:0"  # Rodar como root temporariamente
+    
 networks:
   voxa_network:
-    driver: bridge
+    external: true
 
 volumes:
-  postgres_api_data:
-    driver: local
-  api_data:
+  postgres_data:
     driver: local
   odoo_data:
+    driver: local
+  odoo_filestore:
     driver: local
